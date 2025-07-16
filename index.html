@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor WYSIWYG Avanzado - Mejorado</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js"></script>
+    <style>
+        /* --- Estilos CSS Integrados --- */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            margin: 20px;
+            box-sizing: border-box;
+        }
+
+        .editor-container {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 800px;
+            overflow: hidden;
+        }
+
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            background-color: #f9f9f9;
+            gap: 8px;
+        }
+
+        .menu-group {
+            display: flex;
+            gap: 4px;
+            border-right: 1px solid #eee;
+            padding-right: 8px;
+        }
+
+        .menu-group:last-child {
+            border-right: none;
+        }
+
+        .tool-button, .tool-select, .tool-color {
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.2s, border-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tool-button:hover, .tool-select:hover {
+            background-color: #e9e9e9;
+            border-color: #bbb;
+        }
+
+        .tool-button:active, .tool-button.active {
+            background-color: #dcdcdc;
+            border-color: #aaa;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        .tool-select {
+            padding: 7px 10px;
+        }
+
+        .tool-color {
+            padding: 4px;
+            height: 36px;
+            width: 40px;
+        }
+
+        .editor-content, .html-view {
+            min-height: 300px;
+            padding: 20px;
+            outline: none;
+            line-height: 1.6;
+            font-size: 1rem;
+            color: #333;
+            overflow-y: auto;
+            box-sizing: border-box;
+            background-color: #fcfcfc;
+        }
+
+        .html-view {
+            display: none;
+            border-top: 1px dashed #ddd;
+            resize: vertical;
+            white-space: pre-wrap; /* Para la vista HTML, respeta espacios y saltos de línea */
+            word-wrap: break-word; /* Rompe palabras largas */
+            font-family: 'Courier New', Courier, monospace; /* Fuente monoespaciada para HTML */
+        }
+
+        /* Estilos para elementos dentro del editor */
+        .editor-content h1, .editor-content h2, .editor-content h3,
+        .editor-content h4, .editor-content h5, .editor-content h6 {
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+        }
+
+        .editor-content p {
+            margin-bottom: 1em;
+        }
+
+        .editor-content ul, .editor-content ol {
+            margin-bottom: 1em;
+            padding-left: 20px;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2rem;
+            color: #555;
+            z-index: 10;
+            display: none; /* Oculto por defecto */
+        }
+    </style>
+</head>
+<body>
+    <div class="editor-container">
+        <div class="toolbar">
+            <div class="menu-group">
+                <button class="tool-button" data-command="bold" title="Negrita"><i class="fas fa-bold"></i></button>
+                <button class="tool-button" data-command="italic" title="Cursiva"><i class="fas fa-italic"></i></button>
+                <button class="tool-button" data-command="underline" title="Subrayado"><i class="fas fa-underline"></i></button>
+                <button class="tool-button" data-command="strikeThrough" title="Tachado"><i class="fas fa-strikethrough"></i></button>
+                <button class="tool-button" data-command="removeFormat" title="Limpiar Formato"><i class="fas fa-eraser"></i></button>
+            </div>
+
+            <div class="menu-group">
+                <button class="tool-button" data-command="justifyLeft" title="Alinear Izquierda"><i class="fas fa-align-left"></i></button>
+                <button class="tool-button" data-command="justifyCenter" title="Alinear Centro"><i class="fas fa-align-center"></i></button>
+                <button class="tool-button" data-command="justifyRight" title="Alinear Derecha"><i class="fas fa-align-right"></i></button>
+                <button class="tool-button" data-command="justifyFull" title="Justificar"><i class="fas fa-align-justify"></i></button>
+            </div>
+
+            <div class="menu-group">
+                <button class="tool-button" data-command="insertUnorderedList" title="Lista Desordenada"><i class="fas fa-list-ul"></i></button>
+                <button class="tool-button" data-command="insertOrderedList" title="Lista Ordenada"><i class="fas fa-list-ol"></i></button>
+                <button class="tool-button" data-command="indent" title="Aumentar Sangría"><i class="fas fa-indent"></i></button>
+                <button class="tool-button" data-command="outdent" title="Disminuir Sangría"><i class="fas fa-outdent"></i></button>
+            </div>
+
+            <div class="menu-group">
+                <select class="tool-select" data-command="formatBlock">
+                    <option value="P">Párrafo</option>
+                    <option value="H1">Encabezado 1</option>
+                    <option value="H2">Encabezado 2</option>
+                    <option value="H3">Encabezado 3</option>
+                    <option value="H4">Encabezado 4</option>
+                    <option value="H5">Encabezado 5</option>
+                    <option value="H6">Encabezado 6</option>
+                    <option value="PRE">Preformateado</option>
+                </select>
+            </div>
+
+            <div class="menu-group">
+                <select class="tool-select" data-command="fontName">
+                    <option value="Arial">Arial</option>
+                    <option value="Verdana">Verdana</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Courier New">Courier New</option>
+                </select>
+                <select class="tool-select" data-command="fontSize">
+                    <option value="1">Pequeño (8px)</option>
+                    <option value="2">Normal (10px)</option>
+                    <option value="3">Mediano (12px)</option>
+                    <option value="4">Grande (14px)</option>
+                    <option value="5">Muy Grande (18px)</option>
+                    <option value="6">Enorme (24px)</option>
+                    <option value="7">Gigante (36px)</option>
+                </select>
+            </div>
+
+            <div class="menu-group">
+                <input type="color" class="tool-color" data-command="foreColor" title="Color de Texto">
+                <input type="color" class="tool-color" data-command="backColor" title="Color de Fondo">
+            </div>
+
+            <div class="menu-group">
+                <button class="tool-button" data-command="createLink" title="Insertar Enlace"><i class="fas fa-link"></i></button>
+                <button class="tool-button" data-command="insertImage" title="Insertar Imagen"><i class="fas fa-image"></i></button>
+            </div>
+
+            <div class="menu-group">
+                <button class="tool-button" data-command="undo" title="Deshacer"><i class="fas fa-undo"></i></button>
+                <button class="tool-button" data-command="redo" title="Rehacer"><i class="fas fa-redo"></i></button>
+            </div>
+
+            <div class="menu-group">
+                <button class="tool-button" id="loadHtmlBtn" title="Cargar HTML (pegar código)"><i class="fas fa-file-import"></i></button>
+                <button class="tool-button" id="toggleHtmlViewBtn" title="Ver Código HTML"><i class="fas fa-code"></i></button>
+                <button class="tool-button" id="loadDocxTrigger" title="Cargar Documento de Word (.docx)"><i class="fas fa-file-word"></i></button>
+                <input type="file" id="docxFileInput" accept=".docx" style="display: none;"> </div>
+        </div>
+
+        <div id="editor" class="editor-content" contenteditable="true">
+            <p>Empieza a escribir aquí...</p>
+            <p>Este es un **editor WYSIWYG** avanzado.</p>
+            <ul>
+                <li>Puedes poner texto en *negrita*, <u>subrayado</u>, o <s>tachado</s>.</li>
+                <li>Cambiar el <span style="color: blue;">color del texto</span>.</li>
+                <li>Alinear texto a la izquierda, centro, derecha o justificar.</li>
+            </ul>
+            <h2>Puedes insertar encabezados.</h2>
+            <p>Visita <a href="https://www.google.com" target="_blank">Google</a>.</p>
+            <p>La carga de documentos DOCX es posible gracias a la librería <a href="https://github.com/mwilliamson/mammoth.js" target="_blank">Mammoth.js</a>.</p>
+        </div>
+
+        <textarea id="htmlView" class="html-view" rows="10" readonly></textarea>
+
+        <div id="loadingOverlay" class="loading-overlay">
+            <i class="fas fa-spinner fa-spin"></i> Cargando documento...
+        </div>
+    </div>
+
+    <script>
+        // --- Lógica JavaScript Integrada ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const editor = document.getElementById('editor');
+            const toolbar = document.querySelector('.toolbar');
+            const htmlView = document.getElementById('htmlView');
+            const toggleHtmlViewBtn = document.getElementById('toggleHtmlViewBtn');
+            const loadHtmlBtn = document.getElementById('loadHtmlBtn');
+            const loadDocxTrigger = document.getElementById('loadDocxTrigger');
+            const docxFileInput = document.getElementById('docxFileInput');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+
+            let isHtmlViewActive = false; // Estado para saber si la vista HTML está activa
+
+            /**
+             * Limpia el HTML para eliminar atributos no deseados o redundantes generados por `contenteditable` o `mammoth.js`.
+             * Advertencia: Esta es una limpieza BÁSICA. Para seguridad robusta (XSS), usa DOMPurify o limpieza en el servidor.
+             * @param {string} htmlString El HTML a limpiar.
+             * @returns {string} El HTML limpio.
+             */
+            function cleanHtml(htmlString) {
+                let div = document.createElement('div');
+                div.innerHTML = htmlString;
+
+                // Eliminar atributos style de elementos comunes si son solo 'font-family'
+                div.querySelectorAll('[style]').forEach(el => {
+                    if (el.style.length === 1 && el.style.fontFamily) {
+                        el.removeAttribute('style');
+                    }
+                    if (el.style.cssText === '') { // Si el estilo queda vacío, eliminar el atributo
+                        el.removeAttribute('style');
+                    }
+                });
+
+                // Remover tags <font> que son obsoletas y a menudo generadas
+                div.querySelectorAll('font').forEach(fontEl => {
+                    const span = document.createElement('span');
+                    // Mover estilos si los hay (color, etc.)
+                    if (fontEl.color) span.style.color = fontEl.color;
+                    if (fontEl.face) span.style.fontFamily = fontEl.face;
+                    if (fontEl.size) {
+                        // Mapeo básico de size a px o em
+                        const sizeMap = { '1': '0.75em', '2': '0.875em', '3': '1em', '4': '1.125em', '5': '1.5em', '6': '2em', '7': '3em' };
+                        span.style.fontSize = sizeMap[fontEl.size] || fontEl.size + 'px';
+                    }
+                    while (fontEl.firstChild) {
+                        span.appendChild(fontEl.firstChild);
+                    }
+                    fontEl.parentNode.replaceChild(span, fontEl);
+                });
+
+                // Eliminar atributos como data-*, class, id que no sean necesarios
+                div.querySelectorAll('*').forEach(el => {
+                    // Cuidado con esto, podría eliminar clases importantes para tus estilos CSS
+                    // Por simplicidad, solo removemos 'data-' y 'id' que no sean 'editor' o 'htmlView'
+                    Array.from(el.attributes).forEach(attr => {
+                        if (attr.name.startsWith('data-') || (attr.name === 'id' && !['editor', 'htmlView'].includes(attr.value))) {
+                            el.removeAttribute(attr.name);
+                        }
+                    });
+                });
+
+                return div.innerHTML;
+            }
+
+
+            /**
+             * Establece el contenido del editor y lo limpia.
+             * @param {string} content El HTML a establecer.
+             */
+            function setEditorContent(content) {
+                editor.innerHTML = cleanHtml(content);
+                editor.focus(); // Asegurarse de que el editor tenga el foco
+                updateToolbarState(); // Actualizar la barra de herramientas
+            }
+
+            /**
+             * Ejecuta un comando de edición en el editor.
+             * @param {string} command El comando a ejecutar (ej. 'bold', 'italic').
+             * @param {string} [value=null] El valor asociado al comando (ej. URL para 'createLink').
+             */
+            function executeCommand(command, value = null) {
+                editor.focus();
+                try {
+                    if (command === 'createLink') {
+                        const url = prompt('Introduce la URL del enlace:', 'http://');
+                        if (url) {
+                            document.execCommand(command, false, url);
+                        }
+                    } else if (command === 'insertImage') {
+                        const imageUrl = prompt('Introduce la URL de la imagen:', 'http://');
+                        if (imageUrl) {
+                            document.execCommand(command, false, imageUrl);
+                        }
+                    } else {
+                        document.execCommand(command, false, value);
+                    }
+                    // Después de cada comando, limpiar y actualizar la vista HTML si está activa
+                    setEditorContent(editor.innerHTML); // Limpia el HTML generado por execCommand
+                    if (isHtmlViewActive) {
+                        htmlView.value = editor.innerHTML;
+                    }
+                } catch (e) {
+                    console.error(`Error al ejecutar el comando ${command}:`, e);
+                    alert(`No se pudo aplicar la acción "${command}".`);
+                }
+            }
+
+            // --- Manejadores de Eventos de la Barra de Herramientas ---
+            toolbar.addEventListener('click', (event) => {
+                const button = event.target.closest('.tool-button');
+                if (button) {
+                    const command = button.dataset.command;
+                    if (command) {
+                        executeCommand(command);
+                    }
+                }
+            });
+
+            toolbar.addEventListener('change', (event) => {
+                const select = event.target.closest('.tool-select');
+                if (select) {
+                    const command = select.dataset.command;
+                    const value = select.value;
+                    if (command && value) {
+                        executeCommand(command, value);
+                    }
+                }
+            });
+
+            toolbar.addEventListener('input', (event) => {
+                const colorInput = event.target.closest('.tool-color');
+                if (colorInput) {
+                    const command = colorInput.dataset.command;
+                    const value = colorInput.value;
+                    if (command && value) {
+                        executeCommand(command, value);
+                    }
+                }
+            });
+
+            // --- Funcionalidad de Vista HTML ---
+            toggleHtmlViewBtn.addEventListener('click', () => {
+                isHtmlViewActive = !isHtmlViewActive;
+
+                if (isHtmlViewActive) {
+                    editor.style.display = 'none';
+                    htmlView.style.display = 'block';
+                    htmlView.value = editor.innerHTML; // Cargar el contenido actual del editor
+                    toggleHtmlViewBtn.classList.add('active');
+                    htmlView.focus();
+                } else {
+                    editor.style.display = 'block';
+                    htmlView.style.display = 'none';
+                    setEditorContent(htmlView.value); // Cargar el contenido del textarea al editor y limpiar
+                    toggleHtmlViewBtn.classList.remove('active');
+                }
+                updateToolbarState(); // Reevaluar el estado de la barra de herramientas
+            });
+
+            htmlView.addEventListener('input', () => {
+                // Actualizar el editor en tiempo real mientras se edita el HTML
+                if (isHtmlViewActive) {
+                    editor.innerHTML = htmlView.value; // No limpiar aquí para no interferir con la edición
+                }
+            });
+
+            // --- Funcionalidad de Cargar HTML (pegar código) ---
+            loadHtmlBtn.addEventListener('click', () => {
+                const htmlCode = prompt('Pega el código HTML aquí para cargarlo en el editor:');
+                if (htmlCode !== null) {
+                    setEditorContent(htmlCode); // Establecer y limpiar el HTML pegado
+                    // Asegurarse de que el editor esté en modo WYSIWYG
+                    if (isHtmlViewActive) {
+                        isHtmlViewActive = false;
+                        editor.style.display = 'block';
+                        htmlView.style.display = 'none';
+                        toggleHtmlViewBtn.classList.remove('active');
+                    }
+                }
+            });
+
+            // --- Funcionalidad de Cargar DOCX con mammoth.js ---
+            loadDocxTrigger.addEventListener('click', () => {
+                docxFileInput.click(); // Dispara el clic en el input de tipo file oculto
+            });
+
+            docxFileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    loadingOverlay.style.display = 'flex'; // Mostrar indicador de carga
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const arrayBuffer = e.target.result;
+                        mammoth.convertToHtml({arrayBuffer: arrayBuffer})
+                            .then((result) => {
+                                setEditorContent(result.value); // Establecer el HTML convertido y limpiar
+                                if (result.messages.length > 0) {
+                                    const warnings = result.messages.map(msg => msg.message).join('\n');
+                                    alert(`Documento DOCX cargado con advertencias:\n${warnings}\n\nRevisa la consola para más detalles.`);
+                                    console.warn("Advertencias de conversión DOCX:", result.messages);
+                                } else {
+                                    alert("¡Documento DOCX cargado exitosamente!");
+                                }
+                            })
+                            .catch((error) => {
+                                console.error("Error al convertir DOCX:", error);
+                                alert("¡Error al cargar el documento Word! Asegúrate de que sea un archivo .docx válido y no esté corrupto.");
+                            })
+                            .finally(() => {
+                                loadingOverlay.style.display = 'none'; // Ocultar indicador de carga
+                                // Limpiar el input de archivo para poder cargar el mismo archivo de nuevo si se desea
+                                docxFileInput.value = '';
+                            });
+                    };
+                    reader.readAsArrayBuffer(file); // Leer el archivo como ArrayBuffer para mammoth.js
+                }
+            });
+
+            // --- Actualización del Estado de la Barra de Herramientas ---
+            editor.addEventListener('mouseup', updateToolbarState);
+            editor.addEventListener('keyup', updateToolbarState);
+            editor.addEventListener('focus', updateToolbarState);
+            editor.addEventListener('blur', updateToolbarState); // Para desmarcar cuando el editor pierde el foco
+
+            function updateToolbarState() {
+                // Si la vista HTML está activa o el editor no está enfocado, no actualizamos el estado de los botones WYSIWYG
+                if (isHtmlViewActive || document.activeElement !== editor) {
+                    toolbar.querySelectorAll('.tool-button:not(#toggleHtmlViewBtn), .tool-select, .tool-color').forEach(el => el.classList.remove('active'));
+                    // Asegurarse de que el botón de vista HTML (si está activo) mantenga su estado
+                    if (isHtmlViewActive) {
+                        toggleHtmlViewBtn.classList.add('active');
+                    }
+                    return;
+                }
+
+                // Desmarcar todos los botones primero (excepto toggleHtmlViewBtn)
+                toolbar.querySelectorAll('.tool-button:not(#toggleHtmlViewBtn)').forEach(el => el.classList.remove('active'));
+
+                const commandsToUpdate = [
+                    'bold', 'italic', 'underline', 'strikeThrough',
+                    'justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull',
+                    'insertUnorderedList', 'insertOrderedList', 'indent', 'outdent'
+                ];
+
+                commandsToUpdate.forEach(command => {
+                    const button = toolbar.querySelector(`[data-command="${command}"]`);
+                    if (button && document.queryCommandState(command)) {
+                        button.classList.add('active');
+                    }
+                });
+
+                // Actualizar select de formato de bloque
+                const formatBlockSelect = toolbar.querySelector('[data-command="formatBlock"]');
+                if (formatBlockSelect) {
+                    const currentBlock = document.queryCommandValue('formatBlock').toUpperCase();
+                    const optionExists = Array.from(formatBlockSelect.options).some(option => option.value === currentBlock);
+                    formatBlockSelect.value = optionExists ? currentBlock : 'P';
+                }
+
+                // Actualizar select de fuente
+                const fontNameSelect = toolbar.querySelector('[data-command="fontName"]');
+                if (fontNameSelect) {
+                    const currentFont = document.queryCommandValue('fontName').replace(/"/g, '');
+                    const optionExists = Array.from(fontNameSelect.options).some(option => option.value.toLowerCase() === currentFont.toLowerCase());
+                    fontNameSelect.value = optionExists ? currentFont : fontNameSelect.options[0].value;
+                }
+
+                // Actualizar select de tamaño de fuente
+                const fontSizeSelect = toolbar.querySelector('[data-command="fontSize"]');
+                if (fontSizeSelect) {
+                    const currentSize = document.queryCommandValue('fontSize');
+                    const optionExists = Array.from(fontSizeSelect.options).some(option => option.value === currentSize);
+                    fontSizeSelect.value = optionExists ? currentSize : '3';
+                }
+            }
+
+            // Inicializar el estado de la barra de herramientas al cargar
+            updateToolbarState();
+        });
+    </script>
+</body>
+</html>
+
